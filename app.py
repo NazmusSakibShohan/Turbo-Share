@@ -16,7 +16,7 @@ LINK_EXPIRY = 15 * 60  # 15 minutes in seconds
 # Mapping: { random_id: {"path":..., "time":..., "original_name":...} }
 file_links = {}
 
-def generate_random_string(length=12):
+def generate_random_string(length=8):
     """Generate a unique ID for file links and filenames"""
     return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
 
