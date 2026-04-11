@@ -1,43 +1,51 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="bn">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Turbo Share</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: white; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-        .box { background: #1e293b; padding: 30px; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); text-align: center; width: 360px; border: 1px solid #334155; }
-        h2 { margin-bottom: 15px; color: #38bdf8; }
-        #status { font-weight: bold; margin: 20px 0; color: #94a3b8; font-size: 14px; }
-        .btn { background: #38bdf8; color: #0f172a; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; transition: 0.3s; margin-top: 10px; }
-        .btn:disabled { background: #475569; cursor: not-allowed; }
-        .link-area { background: #0f172a; padding: 10px; border-radius: 5px; margin: 15px 0; font-size: 12px; word-break: break-all; border: 1px dashed #38bdf8; display: none; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: white; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
+        .box { background: #1e293b; padding: 30px; border-radius: 20px; width: 100%; max-width: 400px; text-align: center; border: 1px solid #334155; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+        .btn { background: #38bdf8; color: #0f172a; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; transition: 0.3s; }
+        .btn:disabled { background: #475569; color: #94a3b8; cursor: not-allowed; }
+        #linkBox { background: #0f172a; padding: 12px; border-radius: 8px; font-size: 11px; margin: 15px 0; word-break: break-all; border: 1px dashed #38bdf8; color: #38bdf8; }
+        #status { font-size: 14px; color: #94a3b8; margin-top: 20px; font-weight: bold; }
+        progress { width: 100%; height: 10px; margin-top: 10px; display: none; }
     </style>
 </head>
 <body>
     <div class="box">
-        <h2>Turbo Share</h2>
-        <div id="linkContainer" class="link-area"></div>
-        <button id="copyBtn" class="btn" style="display:none; background:#0ea5e9;" onclick="copyLink()">Copy Share Link</button>
+        <h2 style="color: #38bdf8;">Turbo Share</h2>
         
-        <input type="file" id="fileInput" style="margin-top: 20px;">
+        <div id="setupArea">
+            <div id="linkBox">Link Generating...</div>
+            <button class="btn" onclick="copyLink()" style="background: #0ea5e9; color: white;">Copy Link</button>
+        </div>
+
+        <input type="file" id="fileInput" style="margin-top: 20px; width: 100%;">
+        <progress id="progress" value="0" max="100"></progress>
         <button class="btn" id="sendBtn" onclick="sendFile()" disabled>Searching Peer...</button>
-        <p id="status">Initializing...</p>
+        <p id="status">Connecting to server...</p>
     </div>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
-        const socket = io({ transports: ['polling', 'websocket'] });
-        
+        const socket = io();
         const urlParams = new URLSearchParams(window.location.search);
         let room = urlParams.get('room');
-        
+
         if (!room) {
-            room = "room-" + Math.random().toString(36).substr(2, 9);
-            const shareLink = window.location.origin + "?room=" + room;
-            document.getElementById('linkContainer').innerText = shareLink;
-            document.getElementById('linkContainer').style.display = "block";
-            document.getElementById('copyBtn').style.display = "block";
+            room = "share-" + Math.random().toString(36).substr(2, 9);
+            const newUrl = window.location.origin + window.location.pathname + "?room=" + room;
+            document.getElementById('linkBox').innerText = newUrl;
+        } else {
+            document.getElementById('setupArea').style.display = "none";
+        }
+
+        function copyLink() {
+            navigator.clipboard.writeText(document.getElementById('linkBox').innerText);
+            alert("লিঙ্ক কপি হয়েছে! অন্য ডিভাইসে এটি ওপেন করুন।");
         }
 
         let pc;
@@ -45,59 +53,71 @@
         const config = {
             iceServers: [
                 { urls: "stun:stun.l.google.com:19302" },
+                { urls: "stun:stun1.l.google.com:19302" },
                 { urls: "stun:global.stun.twilio.com:3478" }
             ]
         };
 
         socket.on('connect', () => {
-            document.getElementById('status').innerText = "Server Connected. Share the link!";
+            document.getElementById('status').innerText = "Server Connected. Share link to start.";
             socket.emit('join', room);
         });
 
-        function copyLink() {
-            const link = document.getElementById('linkContainer').innerText;
-            navigator.clipboard.writeText(link);
-            alert("Link copied! Send it to the receiver.");
-        }
-
-        function init() {
+        function createPeer() {
             pc = new RTCPeerConnection(config);
             pc.onicecandidate = (e) => {
                 if (e.candidate) socket.emit('signal', { room, candidate: e.candidate });
             };
-            pc.ondatachannel = (e) => {
-                dc = e.channel;
-                setupDC();
+            
+            pc.ondatachannel = (event) => {
+                dc = event.channel;
+                handleDataChannel();
+            };
+
+            // কানেকশন স্টেট মনিটর করা
+            pc.oniceconnectionstatechange = () => {
+                console.log("ICE State:", pc.iceConnectionState);
+                if(pc.iceConnectionState === 'connected') {
+                    document.getElementById('status').innerText = "P2P Connected! Finalizing...";
+                }
             };
         }
 
-        function setupDC() {
+        function handleDataChannel() {
             dc.onopen = () => {
                 document.getElementById('status').innerText = "Connected & Ready!";
                 document.getElementById('sendBtn').disabled = false;
                 document.getElementById('sendBtn').innerText = "Send File";
             };
+
+            let receivedChunks = [];
             dc.onmessage = (e) => {
-                const blob = new Blob([e.data]);
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url; a.download = "received_file"; a.click();
-                document.getElementById('status').innerText = "File Received!";
+                if (e.data === 'END') {
+                    const blob = new Blob(receivedChunks);
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = "received_file"; a.click();
+                    receivedChunks = [];
+                    document.getElementById('status').innerText = "File Received!";
+                } else {
+                    receivedChunks.push(e.data);
+                }
             };
         }
 
         socket.on('user-joined', async () => {
             document.getElementById('status').innerText = "Peer Found! Connecting...";
-            init();
-            dc = pc.createDataChannel("transfer");
-            setupDC();
+            createPeer();
+            dc = pc.createDataChannel("file-transfer", { ordered: true });
+            handleDataChannel();
+            
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
             socket.emit('signal', { room, offer });
         });
 
         socket.on('signal', async (data) => {
-            if (!pc) init();
+            if (!pc) createPeer();
             if (data.offer) {
                 await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
                 const answer = await pc.createAnswer();
@@ -106,15 +126,26 @@
             } else if (data.answer) {
                 await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
             } else if (data.candidate) {
-                await pc.addIceCandidate(new RTCIceCandidate(data.candidate)).catch(() => {});
+                await pc.addIceCandidate(new RTCIceCandidate(data.candidate)).catch(e => {});
             }
         });
 
         async function sendFile() {
             const file = document.getElementById('fileInput').files[0];
-            if (!file) return alert("Select a file first");
-            const buffer = await file.arrayBuffer();
-            dc.send(buffer);
+            if (!file || !dc || dc.readyState !== 'open') return;
+
+            const CHUNK_SIZE = 16384; // 16KB chunks
+            const arrayBuffer = await file.arrayBuffer();
+            document.getElementById('status').innerText = "Sending...";
+            document.getElementById('progress').style.display = "block";
+
+            for (let i = 0; i < arrayBuffer.byteLength; i += CHUNK_SIZE) {
+                const chunk = arrayBuffer.slice(i, i + CHUNK_SIZE);
+                dc.send(chunk);
+                const percent = Math.round(((i + chunk.byteLength) / arrayBuffer.byteLength) * 100);
+                document.getElementById('progress').value = percent;
+            }
+            dc.send('END');
             document.getElementById('status').innerText = "File Sent!";
         }
     </script>
