@@ -1,68 +1,84 @@
 <!DOCTYPE html>
-<html lang="bn">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Turbo Share</title>
+    <title>Turbo Share - P2P</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #f4f4f9; padding: 20px; }
-        .container { max-width: 400px; margin: auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        input[type="file"] { margin: 20px 0; }
-        button { background: #28a745; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 5px; font-size: 16px; }
-        #status { margin-top: 20px; color: #555; font-weight: bold; }
+        body { font-family: 'Segoe UI', sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #2c3e50; color: white; }
+        .card { background: #34495e; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); text-align: center; width: 350px; }
+        input[type="file"] { margin: 20px 0; display: block; width: 100%; }
+        button { background: #27ae60; color: white; border: none; padding: 12px 25px; border-radius: 5px; cursor: pointer; font-size: 16px; transition: 0.3s; }
+        button:hover { background: #2ecc71; }
+        #status { margin-top: 20px; font-size: 14px; color: #bdc3c7; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h2>Instant File Share</h2>
+    <div class="card">
+        <h2>Turbo Share</h2>
         <input type="file" id="fileInput">
-        <br>
-        <button onclick="sendFile()">Send File</button>
-        <p id="status">Status: Connecting to server...</p>
+        <button id="sendBtn" onclick="sendFile()">Send File</button>
+        <p id="status">Status: Initializing...</p>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        const room = "private-secure-room-007"; 
+        const room = "my-private-secure-room-2026"; 
         let peerConnection;
         let dataChannel;
 
-        const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+        const config = {
+            iceServers: [
+                { urls: "stun:stun.l.google.com:19302" },
+                { urls: "stun:stun1.l.google.com:19302" },
+                { urls: "stun:stun2.l.google.com:19302" }
+            ]
+        };
 
         socket.emit('join', room);
+        document.getElementById('status').innerText = "Status: Waiting for peer...";
 
-        function initPeer() {
+        function createPeerConnection() {
             peerConnection = new RTCPeerConnection(config);
-            
+
             peerConnection.onicecandidate = (event) => {
-                if (event.candidate) socket.emit('signal', { room, candidate: event.candidate });
+                if (event.candidate) {
+                    socket.emit('signal', { room, candidate: event.candidate });
+                }
             };
 
             peerConnection.ondatachannel = (event) => {
-                event.channel.onmessage = (e) => {
+                const receiveChannel = event.channel;
+                receiveChannel.onmessage = (e) => {
                     const blob = new Blob([e.data]);
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = "received_file_" + Date.now();
+                    a.download = "received_file";
+                    document.body.appendChild(a);
                     a.click();
+                    document.body.removeChild(a);
                     document.getElementById('status').innerText = "Status: File Received!";
                 };
             };
         }
 
         socket.on('user-joined', async () => {
-            document.getElementById('status').innerText = "Status: Connected to another device!";
-            initPeer();
+            document.getElementById('status').innerText = "Status: Peer Found! Connecting...";
+            createPeerConnection();
+            
             dataChannel = peerConnection.createDataChannel("fileTransfer");
+            dataChannel.onopen = () => document.getElementById('status').innerText = "Status: Connected & Ready!";
+            
             const offer = await peerConnection.createOffer();
             await peerConnection.setLocalDescription(offer);
             socket.emit('signal', { room, offer });
         });
 
         socket.on('signal', async (data) => {
-            if (!peerConnection) initPeer();
+            if (!peerConnection) createPeerConnection();
+
             if (data.offer) {
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
                 const answer = await peerConnection.createAnswer();
@@ -71,18 +87,20 @@
             } else if (data.answer) {
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
             } else if (data.candidate) {
-                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                try {
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                } catch (e) { console.error("Error adding ice candidate", e); }
             }
         });
 
         async function sendFile() {
             const file = document.getElementById('fileInput').files[0];
-            if (!file) return alert("Please select a file first");
-            if (!dataChannel || dataChannel.readyState !== 'open') return alert("Waiting for connection...");
-            
+            if (!file) return alert("Select a file");
+            if (!dataChannel || dataChannel.readyState !== 'open') return alert("Not connected yet!");
+
             const buffer = await file.arrayBuffer();
             dataChannel.send(buffer);
-            document.getElementById('status').innerText = "Status: File Sent!";
+            document.getElementById('status').innerText = "Status: Sending File...";
         }
     </script>
 </body>
