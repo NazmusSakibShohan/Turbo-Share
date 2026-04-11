@@ -5,8 +5,13 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
+
 const io = new Server(server, {
-    cors: { origin: "*" }
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    },
+    allowEIO3: true // Compatibility-র জন্য
 });
 
 app.use(express.static(__dirname));
@@ -20,16 +25,11 @@ io.on('connection', (socket) => {
 
     socket.on('join', (room) => {
         socket.join(room);
-        console.log(`User joined room: ${room}`);
         socket.to(room).emit('user-joined');
     });
 
     socket.on('signal', (data) => {
         socket.to(data.room).emit('signal', data);
-    });
-
-    socket.on('disconnect', () => {
-        console.log('User disconnected');
     });
 });
 
