@@ -3,82 +3,88 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Turbo Share - P2P</title>
+    <title>Turbo Share - Stable</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #2c3e50; color: white; }
-        .card { background: #34495e; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); text-align: center; width: 350px; }
-        input[type="file"] { margin: 20px 0; display: block; width: 100%; }
-        button { background: #27ae60; color: white; border: none; padding: 12px 25px; border-radius: 5px; cursor: pointer; font-size: 16px; transition: 0.3s; }
-        button:hover { background: #2ecc71; }
-        #status { margin-top: 20px; font-size: 14px; color: #bdc3c7; }
+        body { font-family: 'Segoe UI', sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #1a1a2e; color: white; }
+        .card { background: #16213e; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center; width: 320px; border: 1px solid #0f3460; }
+        #status { margin-top: 20px; font-size: 14px; color: #e94560; font-weight: bold; }
+        button { background: #e94560; color: white; border: none; padding: 12px 25px; border-radius: 5px; cursor: pointer; margin-top: 15px; width: 100%; transition: 0.3s; }
+        button:disabled { background: #555; }
     </style>
 </head>
 <body>
     <div class="card">
         <h2>Turbo Share</h2>
         <input type="file" id="fileInput">
-        <button id="sendBtn" onclick="sendFile()">Send File</button>
-        <p id="status">Status: Initializing...</p>
+        <button id="sendBtn" onclick="sendFile()" disabled>Wait for Peer...</button>
+        <p id="status">Connecting to server...</p>
     </div>
 
-    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
-        const socket = io();
-        const room = "my-private-secure-room-2026"; 
+        // সকেট কানেকশন সেটআপ - Polling দিয়ে শুরু হবে তারপর Websocket এ যাবে
+        const socket = io({
+            transports: ['polling', 'websocket'],
+            reconnectionAttempts: 5
+        });
+
+        const room = "private-room-xyz-2026"; 
         let peerConnection;
         let dataChannel;
 
         const config = {
             iceServers: [
                 { urls: "stun:stun.l.google.com:19302" },
-                { urls: "stun:stun1.l.google.com:19302" },
-                { urls: "stun:stun2.l.google.com:19302" }
+                { urls: "stun:stun1.l.google.com:19302" }
             ]
         };
 
-        socket.emit('join', room);
-        document.getElementById('status').innerText = "Status: Waiting for peer...";
+        socket.on('connect', () => {
+            document.getElementById('status').innerText = "Server Connected. Waiting for peer...";
+            socket.emit('join', room);
+        });
 
-        function createPeerConnection() {
+        socket.on('connect_error', () => {
+            document.getElementById('status').innerText = "Server connection failed! Retrying...";
+        });
+
+        function createPeer() {
             peerConnection = new RTCPeerConnection(config);
-
-            peerConnection.onicecandidate = (event) => {
-                if (event.candidate) {
-                    socket.emit('signal', { room, candidate: event.candidate });
-                }
+            peerConnection.onicecandidate = (e) => {
+                if (e.candidate) socket.emit('signal', { room, candidate: e.candidate });
             };
-
+            
             peerConnection.ondatachannel = (event) => {
-                const receiveChannel = event.channel;
-                receiveChannel.onmessage = (e) => {
+                event.channel.onmessage = (e) => {
                     const blob = new Blob([e.data]);
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
                     a.download = "received_file";
-                    document.body.appendChild(a);
                     a.click();
-                    document.body.removeChild(a);
-                    document.getElementById('status').innerText = "Status: File Received!";
+                    document.getElementById('status').innerText = "File Received!";
                 };
             };
         }
 
         socket.on('user-joined', async () => {
-            document.getElementById('status').innerText = "Status: Peer Found! Connecting...";
-            createPeerConnection();
-            
+            document.getElementById('status').innerText = "Peer Found! Connecting...";
+            createPeer();
             dataChannel = peerConnection.createDataChannel("fileTransfer");
-            dataChannel.onopen = () => document.getElementById('status').innerText = "Status: Connected & Ready!";
             
+            dataChannel.onopen = () => {
+                document.getElementById('status').innerText = "Connected & Ready!";
+                document.getElementById('sendBtn').disabled = false;
+                document.getElementById('sendBtn').innerText = "Send File";
+            };
+
             const offer = await peerConnection.createOffer();
             await peerConnection.setLocalDescription(offer);
             socket.emit('signal', { room, offer });
         });
 
         socket.on('signal', async (data) => {
-            if (!peerConnection) createPeerConnection();
-
+            if (!peerConnection) createPeer();
             if (data.offer) {
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
                 const answer = await peerConnection.createAnswer();
@@ -87,20 +93,17 @@
             } else if (data.answer) {
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
             } else if (data.candidate) {
-                try {
-                    await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-                } catch (e) { console.error("Error adding ice candidate", e); }
+                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
             }
         });
 
         async function sendFile() {
             const file = document.getElementById('fileInput').files[0];
-            if (!file) return alert("Select a file");
-            if (!dataChannel || dataChannel.readyState !== 'open') return alert("Not connected yet!");
-
-            const buffer = await file.arrayBuffer();
-            dataChannel.send(buffer);
-            document.getElementById('status').innerText = "Status: Sending File...";
+            if (file && dataChannel.readyState === 'open') {
+                const buffer = await file.arrayBuffer();
+                dataChannel.send(buffer);
+                document.getElementById('status').innerText = "File Sent!";
+            }
         }
     </script>
 </body>
