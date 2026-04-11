@@ -1,7 +1,7 @@
 {
-  "name": "Turbo Share",
+  "name": "turbo-share",
   "version": "1.0.0",
-  "description": "",
+  "description": "P2P File Transfer",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
