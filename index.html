@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Turbo Share | P2P Transfer</title>
+    <title>Turbo Share</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #0f172a; color: white; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
         .container { background: #1e293b; padding: 30px; border-radius: 20px; width: 100%; max-width: 400px; text-align: center; border: 1px solid #334155; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
@@ -21,34 +21,34 @@
         <h2>Turbo Share</h2>
         
         <div id="setupArea">
-            <p style="font-size: 12px; color: #94a3b8;">Share this link with the receiver:</p>
-            <div id="linkBox">Generating link...</div>
-            <button class="btn" onclick="copyLink()" style="background: #0ea5e9; color: white;">Copy Share Link</button>
+            <p style="font-size: 12px; color: #94a3b8;">Send this link to the other device:</p>
+            <div id="linkBox">Generating...</div>
+            <button class="btn" onclick="copyLink()" style="background: #0ea5e9; color: white;">Copy Link</button>
         </div>
 
         <input type="file" id="fileInput">
         <progress id="progress" value="0" max="100"></progress>
         <button class="btn" id="sendBtn" onclick="sendFile()" disabled>Searching Peer...</button>
-        <p id="status">Connecting to server...</p>
+        <p id="status">Connecting...</p>
+        <button id="retryBtn" class="btn" style="display:none; background:#64748b; font-size:12px;" onclick="location.reload()">Retry Connection</button>
     </div>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
-        const socket = io();
+        const socket = io({ transports: ['polling', 'websocket'] });
         const urlParams = new URLSearchParams(window.location.search);
         let room = urlParams.get('room');
 
         if (!room) {
             room = "share-" + Math.random().toString(36).substr(2, 9);
-            const newUrl = window.location.origin + window.location.pathname + "?room=" + room;
-            document.getElementById('linkBox').innerText = newUrl;
+            document.getElementById('linkBox').innerText = window.location.origin + window.location.pathname + "?room=" + room;
         } else {
             document.getElementById('setupArea').style.display = "none";
         }
 
         function copyLink() {
             navigator.clipboard.writeText(document.getElementById('linkBox').innerText);
-            alert("Link copied to clipboard!");
+            alert("Link copied!");
         }
 
         let pc;
@@ -63,12 +63,14 @@
         };
 
         socket.on('connect', () => {
-            document.getElementById('status').innerText = "Server Connected";
+            document.getElementById('status').innerText = "Server Active. Waiting for peer...";
             socket.emit('join', room);
         });
 
         function createPeer() {
+            if (pc) pc.close();
             pc = new RTCPeerConnection(config);
+            
             pc.onicecandidate = (e) => {
                 if (e.candidate) socket.emit('signal', { room, candidate: e.candidate });
             };
@@ -80,30 +82,29 @@
 
             pc.oniceconnectionstatechange = () => {
                 const state = pc.iceConnectionState;
-                console.log("ICE State:", state);
-                document.getElementById('status').innerText = "Status: " + state.charAt(0).toUpperCase() + state.slice(1);
-                if(state === 'connected') {
-                    document.getElementById('status').style.color = "#22c55e";
+                document.getElementById('status').innerText = "ICE: " + state;
+                if (state === 'failed' || state === 'disconnected') {
+                    document.getElementById('retryBtn').style.display = 'block';
                 }
             };
         }
 
         function handleDataChannel() {
             dc.onopen = () => {
-                document.getElementById('status').innerText = "Connected & Ready!";
+                document.getElementById('status').innerText = "Connected!";
                 document.getElementById('sendBtn').disabled = false;
                 document.getElementById('sendBtn').innerText = "Send File";
             };
-
+            
             let receivedChunks = [];
             dc.onmessage = (e) => {
                 if (e.data === 'EOF') {
                     const blob = new Blob(receivedChunks);
-                    const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
-                    a.href = url; a.download = "received_file_" + Date.now(); a.click();
+                    a.href = URL.createObjectURL(blob);
+                    a.download = "file_" + Date.now(); a.click();
                     receivedChunks = [];
-                    document.getElementById('status').innerText = "File Received Successfully!";
+                    document.getElementById('status').innerText = "Received!";
                 } else {
                     receivedChunks.push(e.data);
                 }
@@ -115,7 +116,6 @@
             createPeer();
             dc = pc.createDataChannel("file-transfer", { ordered: true });
             handleDataChannel();
-            
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
             socket.emit('signal', { room, offer });
@@ -131,7 +131,7 @@
             } else if (data.answer) {
                 await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
             } else if (data.candidate) {
-                await pc.addIceCandidate(new RTCIceCandidate(data.candidate)).catch(e => {});
+                pc.addIceCandidate(new RTCIceCandidate(data.candidate)).catch(e => {});
             }
         });
 
@@ -140,18 +140,15 @@
             if (!file || !dc || dc.readyState !== 'open') return;
 
             const CHUNK_SIZE = 16384; 
-            const arrayBuffer = await file.arrayBuffer();
-            document.getElementById('status').innerText = "Sending...";
+            const buffer = await file.arrayBuffer();
             document.getElementById('progress').style.display = "block";
 
-            for (let i = 0; i < arrayBuffer.byteLength; i += CHUNK_SIZE) {
-                const chunk = arrayBuffer.slice(i, i + CHUNK_SIZE);
-                dc.send(chunk);
-                const percent = Math.round(((i + chunk.byteLength) / arrayBuffer.byteLength) * 100);
-                document.getElementById('progress').value = percent;
+            for (let i = 0; i < buffer.byteLength; i += CHUNK_SIZE) {
+                dc.send(buffer.slice(i, i + CHUNK_SIZE));
+                document.getElementById('progress').value = Math.round(((i + CHUNK_SIZE) / buffer.byteLength) * 100);
             }
             dc.send('EOF');
-            document.getElementById('status').innerText = "File Sent Successfully!";
+            document.getElementById('status').innerText = "Sent!";
         }
     </script>
 </body>
