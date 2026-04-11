@@ -1,5 +1,5 @@
 {
-  "name": "turbo-share",
+  "name": "turbo-share-final",
   "version": "1.0.0",
   "description": "P2P File Transfer",
   "main": "server.js",
