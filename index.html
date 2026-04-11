@@ -1,29 +1,32 @@
 <!DOCTYPE html>
-<html lang="bn">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Turbo Share</title>
+    <title>Turbo Share | P2P Transfer</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: white; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
-        .box { background: #1e293b; padding: 30px; border-radius: 20px; width: 100%; max-width: 400px; text-align: center; border: 1px solid #334155; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #0f172a; color: white; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
+        .container { background: #1e293b; padding: 30px; border-radius: 20px; width: 100%; max-width: 400px; text-align: center; border: 1px solid #334155; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+        h2 { color: #38bdf8; margin-bottom: 20px; }
         .btn { background: #38bdf8; color: #0f172a; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; transition: 0.3s; }
         .btn:disabled { background: #475569; color: #94a3b8; cursor: not-allowed; }
         #linkBox { background: #0f172a; padding: 12px; border-radius: 8px; font-size: 11px; margin: 15px 0; word-break: break-all; border: 1px dashed #38bdf8; color: #38bdf8; }
         #status { font-size: 14px; color: #94a3b8; margin-top: 20px; font-weight: bold; }
+        input[type="file"] { margin: 20px 0; width: 100%; color: #94a3b8; }
         progress { width: 100%; height: 10px; margin-top: 10px; display: none; }
     </style>
 </head>
 <body>
-    <div class="box">
-        <h2 style="color: #38bdf8;">Turbo Share</h2>
+    <div class="container">
+        <h2>Turbo Share</h2>
         
         <div id="setupArea">
-            <div id="linkBox">Link Generating...</div>
-            <button class="btn" onclick="copyLink()" style="background: #0ea5e9; color: white;">Copy Link</button>
+            <p style="font-size: 12px; color: #94a3b8;">Share this link with the receiver:</p>
+            <div id="linkBox">Generating link...</div>
+            <button class="btn" onclick="copyLink()" style="background: #0ea5e9; color: white;">Copy Share Link</button>
         </div>
 
-        <input type="file" id="fileInput" style="margin-top: 20px; width: 100%;">
+        <input type="file" id="fileInput">
         <progress id="progress" value="0" max="100"></progress>
         <button class="btn" id="sendBtn" onclick="sendFile()" disabled>Searching Peer...</button>
         <p id="status">Connecting to server...</p>
@@ -45,7 +48,7 @@
 
         function copyLink() {
             navigator.clipboard.writeText(document.getElementById('linkBox').innerText);
-            alert("লিঙ্ক কপি হয়েছে! অন্য ডিভাইসে এটি ওপেন করুন।");
+            alert("Link copied to clipboard!");
         }
 
         let pc;
@@ -55,11 +58,12 @@
                 { urls: "stun:stun.l.google.com:19302" },
                 { urls: "stun:stun1.l.google.com:19302" },
                 { urls: "stun:global.stun.twilio.com:3478" }
-            ]
+            ],
+            iceCandidatePoolSize: 10
         };
 
         socket.on('connect', () => {
-            document.getElementById('status').innerText = "Server Connected. Share link to start.";
+            document.getElementById('status').innerText = "Server Connected";
             socket.emit('join', room);
         });
 
@@ -74,11 +78,12 @@
                 handleDataChannel();
             };
 
-            // কানেকশন স্টেট মনিটর করা
             pc.oniceconnectionstatechange = () => {
-                console.log("ICE State:", pc.iceConnectionState);
-                if(pc.iceConnectionState === 'connected') {
-                    document.getElementById('status').innerText = "P2P Connected! Finalizing...";
+                const state = pc.iceConnectionState;
+                console.log("ICE State:", state);
+                document.getElementById('status').innerText = "Status: " + state.charAt(0).toUpperCase() + state.slice(1);
+                if(state === 'connected') {
+                    document.getElementById('status').style.color = "#22c55e";
                 }
             };
         }
@@ -92,13 +97,13 @@
 
             let receivedChunks = [];
             dc.onmessage = (e) => {
-                if (e.data === 'END') {
+                if (e.data === 'EOF') {
                     const blob = new Blob(receivedChunks);
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
-                    a.href = url; a.download = "received_file"; a.click();
+                    a.href = url; a.download = "received_file_" + Date.now(); a.click();
                     receivedChunks = [];
-                    document.getElementById('status').innerText = "File Received!";
+                    document.getElementById('status').innerText = "File Received Successfully!";
                 } else {
                     receivedChunks.push(e.data);
                 }
@@ -106,7 +111,7 @@
         }
 
         socket.on('user-joined', async () => {
-            document.getElementById('status').innerText = "Peer Found! Connecting...";
+            document.getElementById('status').innerText = "Peer Found! Handshaking...";
             createPeer();
             dc = pc.createDataChannel("file-transfer", { ordered: true });
             handleDataChannel();
@@ -134,7 +139,7 @@
             const file = document.getElementById('fileInput').files[0];
             if (!file || !dc || dc.readyState !== 'open') return;
 
-            const CHUNK_SIZE = 16384; // 16KB chunks
+            const CHUNK_SIZE = 16384; 
             const arrayBuffer = await file.arrayBuffer();
             document.getElementById('status').innerText = "Sending...";
             document.getElementById('progress').style.display = "block";
@@ -145,8 +150,8 @@
                 const percent = Math.round(((i + chunk.byteLength) / arrayBuffer.byteLength) * 100);
                 document.getElementById('progress').value = percent;
             }
-            dc.send('END');
-            document.getElementById('status').innerText = "File Sent!";
+            dc.send('EOF');
+            document.getElementById('status').innerText = "File Sent Successfully!";
         }
     </script>
 </body>
