@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Turbo Share - Link Based</title>
+    <title>Turbo Share</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: white; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
         .box { background: #1e293b; padding: 30px; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); text-align: center; width: 360px; border: 1px solid #334155; }
@@ -29,7 +29,6 @@
     <script>
         const socket = io({ transports: ['polling', 'websocket'] });
         
-        // URL থেকে রুম আইডি নেওয়া বা নতুন জেনারেট করা
         const urlParams = new URLSearchParams(window.location.search);
         let room = urlParams.get('room');
         
