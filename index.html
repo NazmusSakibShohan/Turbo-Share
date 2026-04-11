@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quick File Share</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #f4f4f9; padding: 20px; }
+        .container { max-width: 400px; margin: auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        input[type="file"] { margin: 20px 0; }
+        button { background: #28a745; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 5px; font-size: 16px; }
+        #status { margin-top: 20px; color: #555; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Instant File Share</h2>
+        <input type="file" id="fileInput">
+        <br>
+        <button onclick="sendFile()">Send File</button>
+        <p id="status">Status: Connecting to server...</p>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const room = "private-secure-room-007"; // আপনার সিক্রেট রুম আইডি
+        let peerConnection;
+        let dataChannel;
+
+        const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+
+        socket.emit('join', room);
+
+        function initPeer() {
+            peerConnection = new RTCPeerConnection(config);
+            
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) socket.emit('signal', { room, candidate: event.candidate });
+            };
+
+            peerConnection.ondatachannel = (event) => {
+                event.channel.onmessage = (e) => {
+                    const blob = new Blob([e.data]);
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = "received_file_" + Date.now();
+                    a.click();
+                    document.getElementById('status').innerText = "Status: File Received!";
+                };
+            };
+        }
+
+        socket.on('user-joined', async () => {
+            document.getElementById('status').innerText = "Status: Connected to another device!";
+            initPeer();
+            dataChannel = peerConnection.createDataChannel("fileTransfer");
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            socket.emit('signal', { room, offer });
+        });
+
+        socket.on('signal', async (data) => {
+            if (!peerConnection) initPeer();
+            if (data.offer) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                socket.emit('signal', { room, answer });
+            } else if (data.answer) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+            } else if (data.candidate) {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+            }
+        });
+
+        async function sendFile() {
+            const file = document.getElementById('fileInput').files[0];
+            if (!file) return alert("Please select a file first");
+            if (!dataChannel || dataChannel.readyState !== 'open') return alert("Waiting for connection...");
+            
+            const buffer = await file.arrayBuffer();
+            dataChannel.send(buffer);
+            document.getElementById('status').innerText = "Status: File Sent!";
+        }
+    </script>
+</body>
+</html>
