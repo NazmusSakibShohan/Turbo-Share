@@ -9,19 +9,27 @@ const io = new Server(server, {
     cors: { origin: "*" }
 });
 
-// index.html ফাইলটি দেখানোর জন্য
+app.use(express.static(__dirname));
+
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 io.on('connection', (socket) => {
+    console.log('User connected:', socket.id);
+
     socket.on('join', (room) => {
         socket.join(room);
+        console.log(`User joined room: ${room}`);
         socket.to(room).emit('user-joined');
     });
 
     socket.on('signal', (data) => {
-        io.to(data.room).emit('signal', data);
+        socket.to(data.room).emit('signal', data);
+    });
+
+    socket.on('disconnect', () => {
+        console.log('User disconnected');
     });
 });
 
