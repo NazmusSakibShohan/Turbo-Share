@@ -3,6 +3,9 @@ import random
 import string
 import time
 import threading
+import io
+import base64
+import qrcode
 from flask import Flask, request, send_file, render_template
 
 app = Flask(__name__)
@@ -54,7 +57,25 @@ def upload():
         }
 
         share_link = request.host_url + random_id
-        return render_template("index.html", link=share_link, error=None)
+
+        # --- QR Code Generation ---
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=2,
+        )
+        qr.add_data(share_link)
+        qr.make(fit=True)
+
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        # Convert QR image to Base64 to display in HTML without saving a file
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        qr_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+        return render_template("index.html", link=share_link, qr_code=qr_base64, error=None)
 
     return render_template("index.html", link=None, error=None)
 
