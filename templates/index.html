@@ -39,7 +39,7 @@
 
         header {
             text-align: center;
-            padding: 100px 20px 40px;
+            padding: 80px 20px 30px;
         }
 
         header h1 {
@@ -74,7 +74,7 @@
             background: var(--glass);
             backdrop-filter: blur(30px);
             -webkit-backdrop-filter: blur(30px);
-            padding: 50px 40px;
+            padding: 40px;
             border-radius: 32px;
             text-align: center;
             border: 1px solid var(--glass-border);
@@ -86,18 +86,18 @@
 
         .upload-card h2 {
             font-size: 1.8rem;
-            margin-bottom: 30px;
+            margin-bottom: 25px;
             font-weight: 700;
             letter-spacing: -1px;
         }
 
         .file-input-wrapper {
             position: relative;
-            margin-bottom: 30px;
+            margin-bottom: 25px;
             border: 2px dashed rgba(255, 255, 255, 0.1);
             border-radius: 20px;
             padding: 40px 20px;
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transition: all 0.4s ease;
             background: rgba(255, 255, 255, 0.01);
         }
 
@@ -140,8 +140,32 @@
             transform: scale(1.02);
         }
 
+        /* --- QR Code Styling --- */
+        .qr-wrapper {
+            background: #fff;
+            padding: 15px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .qr-wrapper img {
+            display: block;
+            width: 160px;
+            height: 160px;
+        }
+
+        .qr-label {
+            color: #000;
+            font-size: 0.65rem;
+            font-weight: 800;
+            margin-top: 8px;
+            letter-spacing: 1px;
+        }
+
         .result-box {
-            margin-top: 35px;
+            margin-top: 30px;
             padding: 24px;
             background: rgba(74, 222, 128, 0.05);
             border: 1px solid rgba(74, 222, 128, 0.15);
@@ -199,7 +223,7 @@
 
         footer {
             text-align: center;
-            padding: 50px 20px;
+            padding: 40px 20px;
             font-size: 0.85rem;
             color: #475569;
             letter-spacing: 1px;
@@ -231,7 +255,15 @@
 
             {% if link %}
                 <div class="result-box">
-                    <div style="color: var(--accent-green); font-weight: 700; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;">Ready for takeoff!</div>
+                    <div style="color: var(--accent-green); font-weight: 700; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 15px;">Link Secured</div>
+                    
+                    {% if qr_code %}
+                    <div class="qr-wrapper">
+                        <img src="data:image/png;base64,{{ qr_code }}" alt="Download QR Code">
+                        <div class="qr-label">SCAN TO DOWNLOAD</div>
+                    </div>
+                    {% endif %}
+
                     <div class="link-container">
                         <span class="link-text" id="shareLink">{{ link }}</span>
                         <button class="btn-copy" onclick="copyToClipboard()" id="copyBtn">Copy</button>
