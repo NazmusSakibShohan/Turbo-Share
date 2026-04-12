@@ -19,7 +19,7 @@ LINK_EXPIRY = 15 * 60  # 15 minutes in seconds
 # Mapping: { random_id: {"path":..., "time":..., "original_name":...} }
 file_links = {}
 
-def generate_random_string(length=8):
+def generate_random_string(length=6):
     """Generate a unique ID for file links and filenames"""
     return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
 
@@ -37,19 +37,14 @@ def upload():
         if file.filename == "":
             return render_template("index.html", link=None, error="No file selected")
 
-        # 1. Generate unique ID
         random_id = generate_random_string()
-        
-        # 2. Extract extension and create a safe filename for the server
         original_filename = file.filename
         extension = os.path.splitext(original_filename)[1]
         safe_filename = f"{random_id}{extension}"
         filepath = os.path.join(UPLOAD_FOLDER, safe_filename)
 
-        # 3. Save file to the server
         file.save(filepath)
 
-        # 4. Store metadata including the original filename
         file_links[random_id] = {
             "path": filepath,
             "time": time.time(),
@@ -59,18 +54,11 @@ def upload():
         share_link = request.host_url + random_id
 
         # --- QR Code Generation ---
-        qr = qrcode.QRCode(
-            version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_L,
-            box_size=10,
-            border=2,
-        )
+        qr = qrcode.QRCode(version=1, box_size=10, border=2)
         qr.add_data(share_link)
         qr.make(fit=True)
-
         img = qr.make_image(fill_color="black", back_color="white")
         
-        # Convert QR image to Base64 to display in HTML without saving a file
         buf = io.BytesIO()
         img.save(buf, format="PNG")
         qr_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
@@ -81,13 +69,24 @@ def upload():
 
 @app.route("/<random_id>")
 def download(random_id):
-    """Serve the file with its original name if the link is valid"""
+    """Serve the file if the link is valid and strictly within the expiration window"""
     file_info = file_links.get(random_id)
     
     if not file_info:
         return "Invalid or expired link", 404
 
-    # 5. Return the file using its original name for the downloader
+    # --- Strict Expiration Check ---
+    now = time.time()
+    if now - file_info["time"] > LINK_EXPIRY:
+        # Delete file and remove from dictionary if time limit is exceeded
+        try:
+            if os.path.exists(file_info["path"]):
+                os.remove(file_info["path"])
+            del file_links[random_id]
+        except Exception as e:
+            print(f"Cleanup error: {e}")
+        return "This link has expired (15 minutes limit exceeded).", 404
+
     return send_file(
         file_info["path"], 
         as_attachment=True, 
@@ -96,11 +95,10 @@ def download(random_id):
 
 # --- Background Cleanup Logic ---
 def cleanup_expired_files():
-    """Periodically removes files older than LINK_EXPIRY"""
+    """Periodically removes files from the server after they expire"""
     while True:
         now = time.time()
         expired_keys = []
-        
         for key, info in list(file_links.items()):
             if now - info["time"] > LINK_EXPIRY:
                 try:
@@ -111,11 +109,11 @@ def cleanup_expired_files():
                 expired_keys.append(key)
 
         for key in expired_keys:
-            del file_links[key]
+            if key in file_links:
+                del file_links[key]
+        time.sleep(60)
 
-        time.sleep(60)  # Check every minute
-
-# Start the background thread
+# Start background cleanup thread
 threading.Thread(target=cleanup_expired_files, daemon=True).start()
 
 if __name__ == "__main__":
