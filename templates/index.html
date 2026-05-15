@@ -66,9 +66,9 @@
         main {
             flex: 1;
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: center;
-            padding: 20px;
+            padding: 20px 20px 60px;
         }
 
         .upload-card {
@@ -81,7 +81,7 @@
             border: 1px solid var(--glass-border);
             box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.7);
             width: 100%;
-            max-width: 450px;
+            max-width: 480px;
             position: relative;
         }
 
@@ -92,14 +92,22 @@
             letter-spacing: -1px;
         }
 
+        /* ── Drop Zone ── */
         .file-input-wrapper {
             position: relative;
-            margin-bottom: 25px;
+            margin-bottom: 18px;
             border: 2px dashed rgba(255, 255, 255, 0.1);
             border-radius: 20px;
             padding: 40px 20px;
             transition: all 0.4s ease;
             background: rgba(255, 255, 255, 0.01);
+            cursor: pointer;
+        }
+
+        .file-input-wrapper.drag-over {
+            border-color: var(--primary);
+            background: rgba(79, 172, 254, 0.08);
+            transform: translateY(-4px);
         }
 
         .file-input-wrapper:hover {
@@ -123,6 +131,77 @@
             filter: drop-shadow(0 0 10px var(--primary));
         }
 
+        #drop-label {
+            display: block;
+            color: #cbd5e1;
+            font-size: 0.95rem;
+        }
+
+        #drop-hint {
+            display: block;
+            margin-top: 6px;
+            font-size: 0.75rem;
+            color: #475569;
+        }
+
+        /* ── File Pill List ── */
+        #file-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 18px;
+            text-align: left;
+        }
+
+        .file-pill {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 12px;
+            padding: 10px 14px;
+            font-size: 0.82rem;
+            color: #cbd5e1;
+            animation: fadeIn 0.2s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .pill-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+            color: #00f2fe;
+            font-weight: 600;
+        }
+
+        .pill-size {
+            color: #475569;
+            margin: 0 10px;
+            flex-shrink: 0;
+            font-size: 0.75rem;
+        }
+
+        .pill-remove {
+            background: none;
+            border: none;
+            color: #f87171;
+            cursor: pointer;
+            font-size: 1rem;
+            line-height: 1;
+            padding: 0;
+            flex-shrink: 0;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+        .pill-remove:hover { opacity: 1; }
+
+        /* ── Submit Button ── */
         .btn-main {
             width: 100%;
             padding: 18px;
@@ -134,6 +213,7 @@
             cursor: pointer;
             font-weight: 700;
             transition: all 0.3s ease;
+            display: none;
         }
 
         .btn-main:hover {
@@ -141,37 +221,39 @@
             transform: scale(1.02);
         }
 
-        /* --- QR Code Styling --- */
-        .qr-wrapper {
-            background: #fff;
-            padding: 15px;
-            border-radius: 20px;
-            display: inline-block;
-            margin-bottom: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        .btn-main:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
         }
 
-        .qr-wrapper img {
-            display: block;
-            width: 160px;
-            height: 160px;
+        /* ── Error ── */
+        .error-msg {
+            margin-top: 20px;
+            color: #f87171;
+            font-size: 0.9rem;
         }
 
-        .qr-label {
-            color: #000;
-            font-size: 0.65rem;
-            font-weight: 800;
-            margin-top: 8px;
-            letter-spacing: 1px;
+        /* ── Results ── */
+        .results-section {
+            margin-top: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
         }
 
         .result-box {
-            margin-top: 30px;
             padding: 24px;
             background: rgba(74, 222, 128, 0.05);
             border: 1px solid rgba(74, 222, 128, 0.15);
             border-radius: 20px;
             animation: slideUp 0.6s ease;
+            text-align: center;
+        }
+
+        .result-box.has-error {
+            background: rgba(239, 68, 68, 0.05);
+            border-color: rgba(239, 68, 68, 0.2);
         }
 
         @keyframes slideUp {
@@ -179,19 +261,60 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
+        .result-label {
+            font-weight: 700;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 4px;
+        }
+
+        .result-filename {
+            font-size: 0.82rem;
+            color: #64748b;
+            margin-bottom: 15px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* QR */
+        .qr-wrapper {
+            background: #fff;
+            padding: 15px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-bottom: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .qr-wrapper img {
+            display: block;
+            width: 140px;
+            height: 140px;
+        }
+
+        .qr-label {
+            color: #000;
+            font-size: 0.6rem;
+            font-weight: 800;
+            margin-top: 6px;
+            letter-spacing: 1px;
+        }
+
+        /* Link row */
         .link-container {
             display: flex;
             align-items: center;
             background: rgba(0, 0, 0, 0.3);
             border-radius: 12px;
             padding: 8px 8px 8px 15px;
-            margin-top: 15px;
             border: 1px solid var(--glass-border);
         }
 
         .link-text {
             flex: 1;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             color: var(--secondary);
             overflow: hidden;
             text-overflow: ellipsis;
@@ -210,17 +333,32 @@
             cursor: pointer;
             transition: all 0.2s;
             margin-left: 10px;
+            flex-shrink: 0;
         }
 
-        .btn-copy:hover {
-            background: #fff;
-            color: #000;
+        .btn-copy:hover { background: #fff; color: #000; }
+        .btn-copy.copied { background: var(--accent-green); color: #000; }
+
+        .expiry-note {
+            margin-top: 10px;
+            font-size: 0.72rem;
+            color: #475569;
         }
 
-        .btn-copy.copied {
-            background: var(--accent-green);
-            color: #000;
+        /* Reset link */
+        .reset-link {
+            margin-top: 24px;
+            text-align: center;
         }
+        .reset-link a {
+            color: var(--primary);
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-decoration: none;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+        .reset-link a:hover { opacity: 1; }
 
         footer {
             text-align: center;
@@ -241,35 +379,56 @@
     <main>
         <div class="upload-card">
             <h2>Start Sharing</h2>
-            <form method="post" enctype="multipart/form-data" id="uploadForm">
-                <div class="file-input-wrapper">
-                    <span class="upload-icon">🚀</span>
-                    <span id="file-name" style="display:block; color: #cbd5e1;">Drop your file here</span>
-                    <input type="file" name="file" required id="fileInput">
-                </div>
-                <button type="submit" class="btn-main">Get Secure Link</button>
-            </form>
+
+            <!-- Drop Zone (no <form>, JS handles submit) -->
+            <div class="file-input-wrapper" id="drop-zone">
+                <span class="upload-icon">🚀</span>
+                <span id="drop-label">Drop your files here</span>
+                <span id="drop-hint">Multiple files supported · 25 MB max each</span>
+                <input type="file" id="fileInput" multiple />
+            </div>
+
+            <!-- Selected file pills -->
+            <div id="file-list"></div>
+
+            <!-- Upload button -->
+            <button class="btn-main" id="uploadBtn">Get Secure Links</button>
 
             {% if error %}
-                <div style="margin-top: 20px; color: #f87171; font-size: 0.9rem;">× {{ error }}</div>
+                <div class="error-msg">× {{ error }}</div>
             {% endif %}
 
-            {% if link %}
-                <div class="result-box">
-                    <div style="color: var(--accent-green); font-weight: 700; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 15px;">Link Secured</div>
-                    
-                    {% if qr_code %}
-                    <div class="qr-wrapper">
-                        <img src="data:image/png;base64,{{ qr_code }}" alt="Download QR Code">
-                        <div class="qr-label">SCAN TO DOWNLOAD</div>
-                    </div>
-                    {% endif %}
+            <!-- Per-file results -->
+            {% if uploads %}
+            <div class="results-section">
+                {% for item in uploads %}
+                <div class="result-box {% if item.error %}has-error{% endif %}">
+                    {% if item.error %}
+                        <div class="result-label" style="color:#f87171;">Skipped</div>
+                        <div class="result-filename">{{ item.original_name }}</div>
+                        <div style="font-size:0.85rem;color:#f87171;">{{ item.error }}</div>
+                    {% else %}
+                        <div class="result-label" style="color:var(--accent-green);">Link Secured</div>
+                        <div class="result-filename">{{ item.original_name }}</div>
 
-                    <div class="link-container">
-                        <span class="link-text" id="shareLink">{{ link }}</span>
-                        <button class="btn-copy" onclick="copyToClipboard()" id="copyBtn">Copy</button>
-                    </div>
+                        {% if item.qr_code %}
+                        <div class="qr-wrapper">
+                            <img src="data:image/png;base64,{{ item.qr_code }}" alt="QR Code">
+                            <div class="qr-label">SCAN TO DOWNLOAD</div>
+                        </div>
+                        {% endif %}
+
+                        <div class="link-container">
+                            <span class="link-text">{{ item.link }}</span>
+                            <button class="btn-copy" onclick="copyLink(this, '{{ item.link }}')">Copy</button>
+                        </div>
+                        <div class="expiry-note">⏳ Expires in 15 minutes</div>
+                    {% endif %}
                 </div>
+                {% endfor %}
+            </div>
+
+            <div class="reset-link"><a href="/">↩ Upload more files</a></div>
             {% endif %}
         </div>
     </main>
@@ -279,28 +438,109 @@
     </footer>
 
     <script>
+        const dropZone  = document.getElementById('drop-zone');
         const fileInput = document.getElementById('fileInput');
-        const fileNameDisplay = document.getElementById('file-name');
+        const fileList  = document.getElementById('file-list');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const dropLabel = document.getElementById('drop-label');
 
-        fileInput.addEventListener('change', function(e) {
-            if (e.target.files.length > 0) {
-                fileNameDisplay.textContent = e.target.files[0].name;
-                fileNameDisplay.style.color = '#00f2fe';
-                fileNameDisplay.style.fontWeight = '700';
-            }
+        let selectedFiles = [];
+
+        // ── Drag & drop ──
+        dropZone.addEventListener('dragover', e => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+        ['dragleave', 'dragend'].forEach(ev =>
+            dropZone.addEventListener(ev, () => dropZone.classList.remove('drag-over'))
+        );
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            mergeFiles([...e.dataTransfer.files]);
         });
 
-        function copyToClipboard() {
-            const linkText = document.getElementById('shareLink').innerText;
-            const copyBtn = document.getElementById('copyBtn');
-            
-            navigator.clipboard.writeText(linkText).then(() => {
-                copyBtn.innerText = 'Copied!';
-                copyBtn.classList.add('copied');
-                
+        fileInput.addEventListener('change', () => {
+            mergeFiles([...fileInput.files]);
+            fileInput.value = '';          // reset so same file can be re-picked
+        });
+
+        function mergeFiles(incoming) {
+            incoming.forEach(f => {
+                if (!selectedFiles.find(x => x.name === f.name && x.size === f.size))
+                    selectedFiles.push(f);
+            });
+            render();
+        }
+
+        function removeFile(i) {
+            selectedFiles.splice(i, 1);
+            render();
+        }
+
+        function fmtSize(b) {
+            return b >= 1048576
+                ? (b / 1048576).toFixed(1) + ' MB'
+                : Math.round(b / 1024) + ' KB';
+        }
+
+        function render() {
+            fileList.innerHTML = '';
+
+            if (!selectedFiles.length) {
+                uploadBtn.style.display = 'none';
+                dropLabel.textContent = 'Drop your files here';
+                dropLabel.style.color = '#cbd5e1';
+                return;
+            }
+
+            dropLabel.textContent = `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} selected`;
+            dropLabel.style.color = '#00f2fe';
+
+            selectedFiles.forEach((f, i) => {
+                const pill = document.createElement('div');
+                pill.className = 'file-pill';
+                pill.innerHTML = `
+                    <span class="pill-name" title="${f.name}">📄 ${f.name}</span>
+                    <span class="pill-size">${fmtSize(f.size)}</span>
+                    <button class="pill-remove" onclick="removeFile(${i})" title="Remove">✕</button>
+                `;
+                fileList.appendChild(pill);
+            });
+
+            uploadBtn.style.display = 'block';
+            uploadBtn.textContent = selectedFiles.length === 1
+                ? 'Get Secure Link'
+                : `Get Secure Links (${selectedFiles.length})`;
+        }
+
+        // ── Upload via fetch ──
+        uploadBtn.addEventListener('click', () => {
+            if (!selectedFiles.length) return;
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Uploading…';
+
+            const fd = new FormData();
+            selectedFiles.forEach(f => fd.append('file', f));
+
+            fetch('/', { method: 'POST', body: fd })
+                .then(r => r.text())
+                .then(html => { document.open(); document.write(html); document.close(); })
+                .catch(() => {
+                    uploadBtn.disabled = false;
+                    render();
+                    alert('Upload failed. Please try again.');
+                });
+        });
+
+        // ── Copy helper ──
+        function copyLink(btn, link) {
+            navigator.clipboard.writeText(link).then(() => {
+                btn.textContent = 'Copied!';
+                btn.classList.add('copied');
                 setTimeout(() => {
-                    copyBtn.innerText = 'Copy';
-                    copyBtn.classList.remove('copied');
+                    btn.textContent = 'Copy';
+                    btn.classList.remove('copied');
                 }, 2000);
             });
         }
